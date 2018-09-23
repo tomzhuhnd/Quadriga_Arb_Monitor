@@ -7,9 +7,8 @@ from threading          import Thread, Event
 
 # Program packages
 import front_end_manager
+import connectivity_tfx
 
-# Websocket packages
-import ws_bfx_handler
 
 class program_master(Thread):
 
@@ -29,16 +28,20 @@ class program_master(Thread):
         self._gui_thread = None
         self._bfx_thread = None
 
-        # Thread statuses
-        self.thread_status = {}
-
         # Incoming Queues
         self._inbound_gui_q = Queue()
+        self._inbound_tfx_q = Queue()
 
         # Outgoing Queues
         self._outbound_gui_q = Queue()
 
         # Data grid variables
+        self.settings_grid = {}
+        self.settings_grid['TARGET_ARB_COINS'] = ['BTC', 'ETH', 'BCH', 'BTG', 'LTC', '-']
+
+        self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Inactive'}
+        self.selection_grid = {'target_coin': None}
+        self.data_grid = {'fx_pair': '', 'fx_rate': 0.0}
 
         # Class command handlers
         self.command_handlers = {
@@ -56,26 +59,22 @@ class program_master(Thread):
     def run(self):
 
         # Update status in thread status
-        self.thread_status['master'] = True         # Todo: add handler to push status to gui
-        print(self.__name + ' thread - started! Initializing child threads ... ')
+        print(self.__name + ' thread - started! Initializing child threads.')
 
         # Start Gui Thread
-        self._gui_thread = front_end_manager.gui_manager(
-            self._inbound_gui_q,
-            self._outbound_gui_q
+        self._gui_thread = front_end_manager.gui_manager(self, self._inbound_gui_q, self._outbound_gui_q
         )
         self._gui_thread.start()
-        self.thread_status['gui'] = True
         self.thread_command_handlers['gui'] = self._gui_thread.command_handlers
 
-        # # Start bfx_ws Thread
-        # self._bfx_thread = ws_bfx_handler.bfx_websocket()
-        # self._bfx_thread.start()
-        # self.thread_status['bfx_ws'] = True
+        # Wait for the gui thread to properly initialize
+        time.sleep(0.5)
+        self.update_thread_status(self.__name, 'Active')
 
-        # # Wait for websocket to establish connections before sending subscription requests
-        # time.sleep(1)
-        # self._bfx_thread.subscribe_to_channel('trades', 'fBTC')
+        # Start True FX Thread
+        self._tfx_thread = connectivity_tfx.tfx_webservice(self, self._inbound_tfx_q)
+        self._tfx_thread.subscribe_fx_pair('USDCAD')
+        self._tfx_thread.start()
 
         # Main Loop
         while not self.stopped.is_set():
@@ -90,10 +89,28 @@ class program_master(Thread):
 
             print(self.__name + ' thread - Main Program shutting down, killing child threads.')
             self._gui_thread.stop()
+            self._tfx_thread.stop()
 
             time.sleep(0.5)
             print(self.__name + ' thread - Exiting.')
             return
+
+    def update_thread_status(self, thread_name, status):
+
+        self.status_grid[thread_name] = status
+        self._gui_thread.update_status_grid()
+
+    def update_thread_selection(self, selection_name, selection):
+        if self.selection_grid[selection_name] == selection:
+            print('Already selected')
+        else:
+            print(selection_name + ' - ' + selection)
+            self.selection_grid[selection_name] = selection
+
+    def update_thread_data(self):
+
+        # Pushes entire data_grid to all threads that consume it
+        pass
 
     def run_cmd(self, src_name, tgt_name, cmd_name, payload):
         if not tgt_name in self.thread_command_handlers:
