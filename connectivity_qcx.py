@@ -35,3 +35,20 @@ class qcx_webservice(Thread):
         while not self._stopped.is_set():
             print()
 
+    def request_orderbook(self):
+        pass
+
+def request_orderbook():
+
+    request_url = config.qcx_url + 'order_book'
+    request_parameters = {'book': 'btc_cad'}
+    resp = requests.get(request_url, params=request_parameters)
+
+    if resp.status_code != 200:
+        return False
+    else:
+        raw_resp = resp.content.decode('utf-8')
+
+    print(raw_resp)
+
+request_orderbook()

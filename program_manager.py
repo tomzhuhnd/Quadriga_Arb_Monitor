@@ -40,7 +40,7 @@ class program_master(Thread):
         self.settings_grid['TARGET_ARB_COINS'] = ['BTC', 'ETH', 'BCH', 'BTG', 'LTC', '-']
 
         self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Inactive'}
-        self.selection_grid = {'target_coin': None}
+        self.selection_grid = {'target_coin': None, 'target_notional': 0.0}
         self.data_grid = {'fx_pair': '', 'fx_rate': 0.0}
 
         # Class command handlers
@@ -104,7 +104,7 @@ class program_master(Thread):
         if self.selection_grid[selection_name] == selection:
             print('Already selected')
         else:
-            print(selection_name + ' - ' + selection)
+            print(selection_name + ' - ' + str(selection))
             self.selection_grid[selection_name] = selection
 
     def update_thread_data(self):

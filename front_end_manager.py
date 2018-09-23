@@ -28,7 +28,7 @@ class gui_manager(Thread):
         self.status_grid = self.master_thread.status_grid
         self.selection_grid = self.master_thread.selection_grid
         self.data_grid = self.master_thread.data_grid
-        self.loop_timer = 0
+        self.loop_timer = 0.05
 
         # Class queues
         self.inbound_q  = inbound_queue
@@ -121,7 +121,9 @@ class main_window:
             0: {0: None},
             1: {0: None},
             2: {0: None},
-            3: {0: None, 1: None}
+            3: {0: None, 1: None, 2: None, 3: None, 4: None, 5: None},
+            4: {0: None, 1: None, 2: None,          4: None, 5: None}
+
         }
         # Window grid variables
         self._tk_var_obj = {
@@ -129,14 +131,19 @@ class main_window:
             1: {0: 'Master Thread', 1: 'TrueFX Thread'},
             2: {0: tk.StringVar(),  1: tk.StringVar()},
             3: {0: 'Coin to Arb:', 1: tk.StringVar(), 2: 'FX Pair:', 3: tk.StringVar(),
-                4: 'FX Rate:', 5: tk.DoubleVar()}
+                4: 'FX Rate:', 5: tk.DoubleVar()},
+            4: {0: 'Notional Target (CAD):', 1: tk.DoubleVar(), 2: 'Set Notional Target',
+                4: 'Target (CAD):', 5: tk.StringVar()}
         }
+
+        # Window width settings
+        self._column_width = {0: 250, 1: 250, 2: 150, 3: 150, 4: 150, 5: 150}
 
         # ========================================== GRID OBJECTS ========================================== #
         # ============================================== ROW 0 ============================================= #
         self._tk_grid_obj[0][0] = tk.Button(
             self.gui_root,
-            text=self._tk_var_obj[0][0], font=font_collection['header1'],
+            text=self._tk_var_obj[0][0], font=font_collection['header1'], background='light grey',
             command=self.__button_stop_main
         )
         self._tk_grid_obj[0][0].grid(row=0, column=0, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
@@ -144,13 +151,13 @@ class main_window:
         # ============================================== ROW 1 ============================================= #
 
         self._tk_grid_obj[1][0] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[0],
             text=self._tk_var_obj[1][0], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[1][0].grid(row=1, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         self._tk_grid_obj[1][1] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[1],
             text=self._tk_var_obj[1][1], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[1][1].grid(row=1, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
@@ -158,20 +165,20 @@ class main_window:
         # ============================================== ROW 2 ============================================= #
 
         self._tk_grid_obj[2][0] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[0],
             textvariable=self._tk_var_obj[2][0], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[2][0].grid(row=2, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         self._tk_grid_obj[2][1] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[1],
             textvariable=self._tk_var_obj[2][1], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[2][1].grid(row=2, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         # ============================================== ROW 3 ============================================= #
         self._tk_grid_obj[3][0] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[0],
             text=self._tk_var_obj[3][0], font=font_collection['header1']
         )
         self._tk_grid_obj[3][0].grid(row=3, column=0, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'),columnspan=1)
@@ -185,34 +192,79 @@ class main_window:
         self._tk_grid_obj[3][1].grid(row=3, column=1, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         self._tk_grid_obj[3][2] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[2],
             text=self._tk_var_obj[3][2], font=font_collection['header1']
         )
         self._tk_grid_obj[3][2].grid(row=3, column=2, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         self._tk_var_obj[3][3].set('')
         self._tk_grid_obj[3][3] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[3],
             textvariable=self._tk_var_obj[3][3], font=font_collection['body1']
         )
         self._tk_grid_obj[3][3].grid(row=3, column=3, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         self._tk_grid_obj[3][4] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[4],
             text=self._tk_var_obj[3][4], font=font_collection['header1']
         )
         self._tk_grid_obj[3][4].grid(row=3, column=4, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
         self._tk_var_obj[3][5].set('')
         self._tk_grid_obj[3][5] = tk.Message(
-            self.gui_root, width=200,
+            self.gui_root, width=self._column_width[5],
             textvariable=self._tk_var_obj[3][5], font=font_collection['body1']
         )
         self._tk_grid_obj[3][5].grid(row=3, column=5, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        # ============================================== ROW 4 ============================================= #
+        self._tk_grid_obj[4][0] = tk.Message(
+            self.gui_root, width=self._column_width[0],
+            text=self._tk_var_obj[4][0], font=font_collection['header1']
+        )
+        self._tk_grid_obj[4][0].grid(row=4, column=0, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[4][1] = tk.Entry(
+            self.gui_root,
+            textvariable=self._tk_var_obj[4][1], font=font_collection['body1'], justify='right'
+        )
+        self._tk_grid_obj[4][1].grid(row=4, column=1, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[4][2] = tk.Button(
+            self.gui_root,
+            text=self._tk_var_obj[4][2], font=font_collection['header1'], background='light grey',
+            command=self.__button_set_notional
+        )
+        self._tk_grid_obj[4][2].grid(row=4, column=2, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
+
+        self._tk_grid_obj[4][4] = tk.Message(
+            self.gui_root, width=self._column_width[4],
+            text=self._tk_var_obj[4][4], font=font_collection['header1']
+        )
+        self._tk_grid_obj[4][4].grid(row=4, column=4, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[4][5] = tk.Message(
+            self.gui_root, width=self._column_width[5],
+            textvariable=self._tk_var_obj[4][5], font=font_collection['body1'], justify='right'
+        )
+        self._tk_grid_obj[4][5].grid(row=4, column=5, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
     # ========================================== Button Commands ========================================== #
     def __button_stop_main(self):
         self.outbound_q.put((self.__name, 'master', 'stop_all', None))
+
+    def __button_set_notional(self):
+        try:
+            selected_notional = self._tk_var_obj[4][1].get()
+            print(selected_notional, type(selected_notional))
+            if selected_notional > 0:
+                self.parent.master_thread.update_thread_selection('target_notional', selected_notional)
+                self._tk_var_obj[4][5].set('$ {0:.2f}'.format(selected_notional))
+            else:
+                self._tk_var_obj[4][1].set(0.0)
+        except Exception as e:
+            print(self.__name + ' thread - Exception! Notional Entry is not float type!')
+            self._tk_var_obj[4][1].set(0.0)
 
     # ========================================== Trace Callback commands========================================== #
     def __trace_option_menu_change_r3_c1(self, *args):
