@@ -7,7 +7,7 @@ from threading          import Thread, Event
 
 # Program packages
 import front_end_manager
-import connectivity_tfx
+import connectivity_tfx, connectivity_qcx
 
 
 class program_master(Thread):
@@ -16,7 +16,7 @@ class program_master(Thread):
 
         # Class name
         self.__name = 'master'
-        print(self.__name + ' thread - initializing ... ', end='')
+        print(self.__name + ' thread - Initializing ... ', end='')
 
         # Class internal variables
         self.__sleep_timer = 0.01
@@ -31,16 +31,18 @@ class program_master(Thread):
         # Incoming Queues
         self._inbound_gui_q = Queue()
         self._inbound_tfx_q = Queue()
+        self._inbound_qcx_q = Queue()
 
         # Outgoing Queues
         self._outbound_gui_q = Queue()
 
         # Data grid variables
         self.settings_grid = {}
-        self.settings_grid['TARGET_ARB_COINS'] = ['BTC', 'ETH', 'BCH', 'BTG', 'LTC', '-']
+        self.settings_grid['TARGET_ARB_COINS'] = ['BTC', 'ETH', 'BCH', 'LTC', '-']
+        self.settings_grid['EXCHANGE_SIDE'] = {'qcx_ws': 'sell'}
 
-        self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Inactive'}
-        self.selection_grid = {'target_coin': None, 'target_notional': 0.0}
+        self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Offline', 'qcx_ws': 'Offline'}
+        self.selection_grid = {'target_coin': '-', 'target_notional': 0.0}
         self.data_grid = {'fx_pair': '', 'fx_rate': 0.0}
 
         # Class command handlers
@@ -54,12 +56,12 @@ class program_master(Thread):
 
         # Initialization complete. Instantiate thread
         super(program_master, self).__init__()
-        print('done.')
+        print('Done.')
 
     def run(self):
 
         # Update status in thread status
-        print(self.__name + ' thread - started! Initializing child threads.')
+        print(self.__name + ' thread - Started! Initializing child threads.')
 
         # Start Gui Thread
         self._gui_thread = front_end_manager.gui_manager(self, self._inbound_gui_q, self._outbound_gui_q
@@ -76,6 +78,11 @@ class program_master(Thread):
         self._tfx_thread.subscribe_fx_pair('USDCAD')
         self._tfx_thread.start()
 
+        # Start QuadrigaCX Thread
+        self._qcx_thread = connectivity_qcx.qcx_webservice(self, self._inbound_qcx_q)
+        self._qcx_thread.start()
+
+
         # Main Loop
         while not self.stopped.is_set():
 
@@ -88,9 +95,9 @@ class program_master(Thread):
         if self.stopped.is_set():
 
             print(self.__name + ' thread - Main Program shutting down, killing child threads.')
-            self._gui_thread.stop()
             self._tfx_thread.stop()
-
+            self._qcx_thread.stop()
+            self._gui_thread.stop()
             time.sleep(0.5)
             print(self.__name + ' thread - Exiting.')
             return
@@ -102,9 +109,8 @@ class program_master(Thread):
 
     def update_thread_selection(self, selection_name, selection):
         if self.selection_grid[selection_name] == selection:
-            print('Already selected')
+            print('"' + selection + '" for "' + selection_name + '" has already been selected!')
         else:
-            print(selection_name + ' - ' + str(selection))
             self.selection_grid[selection_name] = selection
 
     def update_thread_data(self):

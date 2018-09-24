@@ -108,7 +108,7 @@ class main_window:
 
         # Status grid mappings to GUI dynamic variables
         self.status_map = {
-            'master': (2, 0), 'tfx_ws': (2, 1)
+            'master': (2, 0), 'tfx_ws': (2, 1), 'qcx_ws': (2, 2)
         }
 
         # Data grid mappings to GUI dynamic variables
@@ -119,8 +119,8 @@ class main_window:
         # Window grid objects
         self._tk_grid_obj = {
             0: {0: None},
-            1: {0: None},
-            2: {0: None},
+            1: {0: None, 1: None, 2: None},
+            2: {0: None, 1: None, 2: None},
             3: {0: None, 1: None, 2: None, 3: None, 4: None, 5: None},
             4: {0: None, 1: None, 2: None,          4: None, 5: None}
 
@@ -128,8 +128,8 @@ class main_window:
         # Window grid variables
         self._tk_var_obj = {
             0: {0: 'Stop Main Program'},
-            1: {0: 'Master Thread', 1: 'TrueFX Thread'},
-            2: {0: tk.StringVar(),  1: tk.StringVar()},
+            1: {0: 'Master Thread', 1: 'TrueFX Thread', 2: 'Quadriga Thread'},
+            2: {0: tk.StringVar(),  1: tk.StringVar(),  2: tk.StringVar()},
             3: {0: 'Coin to Arb:', 1: tk.StringVar(), 2: 'FX Pair:', 3: tk.StringVar(),
                 4: 'FX Rate:', 5: tk.DoubleVar()},
             4: {0: 'Notional Target (CAD):', 1: tk.DoubleVar(), 2: 'Set Notional Target',
@@ -162,6 +162,12 @@ class main_window:
         )
         self._tk_grid_obj[1][1].grid(row=1, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_grid_obj[1][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            text=self._tk_var_obj[1][2], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[1][2].grid(row=1, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
         # ============================================== ROW 2 ============================================= #
 
         self._tk_grid_obj[2][0] = tk.Message(
@@ -176,6 +182,12 @@ class main_window:
         )
         self._tk_grid_obj[2][1].grid(row=2, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_grid_obj[2][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            textvariable=self._tk_var_obj[2][2], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[2][2].grid(row=2, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
         # ============================================== ROW 3 ============================================= #
         self._tk_grid_obj[3][0] = tk.Message(
             self.gui_root, width=self._column_width[0],
@@ -183,7 +195,7 @@ class main_window:
         )
         self._tk_grid_obj[3][0].grid(row=3, column=0, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'),columnspan=1)
 
-        self._tk_var_obj[3][1].set('-')
+        self._tk_var_obj[3][1].set(self.parent.selection_grid['target_coin'])
         self._tk_var_obj[3][1].trace('w', self.__trace_option_menu_change_r3_c1)
         self._tk_grid_obj[3][1] = tk.OptionMenu(
             self.gui_root, self._tk_var_obj[3][1], *self.parent.settings_grid['TARGET_ARB_COINS']
@@ -256,7 +268,6 @@ class main_window:
     def __button_set_notional(self):
         try:
             selected_notional = self._tk_var_obj[4][1].get()
-            print(selected_notional, type(selected_notional))
             if selected_notional > 0:
                 self.parent.master_thread.update_thread_selection('target_notional', selected_notional)
                 self._tk_var_obj[4][5].set('$ {0:.2f}'.format(selected_notional))

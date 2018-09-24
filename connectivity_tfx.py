@@ -32,7 +32,7 @@ class tfx_webservice(Thread):
     def run(self):
 
         print(self.__name + ' thread - Starting.')
-        self.parent.update_thread_status(self.__name, 'Active')
+        self.parent.update_thread_status(self.__name, 'Online')
 
         # Main loop
         while not self._stopped.is_set():
@@ -46,6 +46,7 @@ class tfx_webservice(Thread):
     def stop(self):
 
         print(self.__name + ' thread - Shutting down.')
+        self.parent.update_thread_status(self.__name, 'Offline')
         self._stopped.set()
 
     def subscribe_fx_pair(self, pair):
