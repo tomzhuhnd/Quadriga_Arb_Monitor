@@ -9,6 +9,7 @@ from threading          import Thread, Event
 import front_end_manager
 import connectivity_tfx, connectivity_qcx
 
+# Session settings
 
 class program_master(Thread):
 
@@ -70,7 +71,7 @@ class program_master(Thread):
         self.thread_command_handlers['gui'] = self._gui_thread.command_handlers
 
         # Wait for the gui thread to properly initialize
-        time.sleep(0.5)
+        time.sleep(1)
         self.update_thread_status(self.__name, 'Active')
 
         # Start True FX Thread

@@ -30,7 +30,7 @@ class qcx_webservice(Thread):
 
     def run(self):
 
-        print(self.__name + ' thread - Starting.')
+        print(self.__name + ' thread - Started.')
         self.parent.update_thread_status(self.__name, 'Online')
 
         # Main loop
@@ -38,28 +38,64 @@ class qcx_webservice(Thread):
 
             # print(self.parent.selection_grid['target_coin'], self.parent.selection_grid['target_notional'])
 
-            self.request_orderbook()
+            self.request_orderbook('cad')
 
             time.sleep(self.loop_timer)
 
         return
 
-    def request_orderbook(self):
+    def request_orderbook(self, base_currency):
 
         # Check to see if a target_coin and target_notional has been selected
         if self.parent.selection_grid['target_coin'] == '-' or self.parent.selection_grid['target_notional'] == 0.0:
             return
 
-        print(self.parent.selection_grid['target_coin'],
-              self.parent.selection_grid['target_notional'],
-              self.parent.settings_grid['EXCHANGE_SIDE']['qcx_ws'])
+        target_coin = self.parent.selection_grid['target_coin'].lower()
+        target_notional = self.parent.selection_grid['target_notional']
+        target_side = self.parent.settings_grid['EXCHANGE_SIDE'][self.__name]
+
+        if target_side == 'sell':
+            target_side = 'bids'
+        else:
+            target_side = 'asks'
 
         request_url = config.qcx_url + 'order_book'
 
-        # We need to make two requests | CAD Book and USD Book
-        request_parameters = ''
+        pair = target_coin + '_' + base_currency.lower()
+        request_parameters = {'book': pair}
+        resp = requests.get(request_url, params=request_parameters)
 
-        # Convert target coin
+        if resp.status_code != 200:
+            print(resp.status_code)
+            return
+        else:
+            raw_resp = json.loads(resp.content.decode('utf-8'))
+
+        if target_side == 'asks':
+            order_book = raw_resp['asks']
+        else:
+            order_book = raw_resp['bids']
+
+        print('Average Cost of Coins: ' + str(self.average_cost_from_book(target_notional, order_book)))
+
+    def average_cost_from_book(self, target_notional, order_book):
+
+        total_coin = 0.0
+        total_notional = 0.0
+
+        for level in order_book:
+            price = float(level[0])
+            coins = float(level[1])
+            level_notional = price * coins
+            if total_notional + level_notional >= target_notional:
+                total_coin += (target_notional - total_notional) / price
+                total_notional += target_notional - total_notional
+                break
+            else:
+                total_notional += level_notional
+                total_coin += coins
+
+        return total_notional / total_coin
 
     def stop(self):
 
@@ -102,12 +138,6 @@ def request_orderbook():
             total_notional += level_notional
             total_coin += coins
             notional -= level_notional
-
-    print(total_notional, total_coin, total_notional / total_coin)
-
-    #
-    # for bids in raw_resp['bids']:
-    #     print(bids)
 
     for asks in raw_resp['bids']:
         print(asks)

@@ -18,7 +18,7 @@ class gui_manager(Thread):
 
         # Class name
         self.__name = 'gui'
-        print(self.__name + ' thread - initializing ... ', end='')
+        print(self.__name + ' thread - Initializing ... ', end='')
 
         # Master thread
         self.master_thread = master_thread
@@ -42,12 +42,12 @@ class gui_manager(Thread):
 
         }
 
-        print('done.')
+        print('Done.')
         super(gui_manager, self).__init__()
 
     def run(self):
 
-        print(self.__name + ' thread - starting.')
+        print(self.__name + ' thread - Started.')
 
         # Generate tkinter master window
         self.gui_root = tk.Tk()
@@ -122,8 +122,10 @@ class main_window:
             1: {0: None, 1: None, 2: None},
             2: {0: None, 1: None, 2: None},
             3: {0: None, 1: None, 2: None, 3: None, 4: None, 5: None},
-            4: {0: None, 1: None, 2: None,          4: None, 5: None}
-
+            4: {0: None, 1: None, 2: None,          4: None, 5: None},
+            5: {0: None, 1: None, 2: None,          4: None},
+            6: {0: None, 1: None, 2: None,          4: None},
+            7: {0: None}                                                        # Spacing
         }
         # Window grid variables
         self._tk_var_obj = {
@@ -133,7 +135,10 @@ class main_window:
             3: {0: 'Coin to Arb:', 1: tk.StringVar(), 2: 'FX Pair:', 3: tk.StringVar(),
                 4: 'FX Rate:', 5: tk.DoubleVar()},
             4: {0: 'Notional Target (CAD):', 1: tk.DoubleVar(), 2: 'Set Notional Target',
-                4: 'Target (CAD):', 5: tk.StringVar()}
+                4: 'Target (CAD):', 5: tk.StringVar()},
+            5: {0: 'Quadriga CAD Price', 1: 'Quadriga USD Price', 2: 'BitFinex CAD Price', 4: 'BitFinex USD Price'},
+            6: {0: tk.DoubleVar(), 1: tk.DoubleVar(), 2: tk.DoubleVar(), 4: tk.DoubleVar()},
+            7: {0: ''}                                                          # Spacing
         }
 
         # Window width settings
@@ -166,7 +171,7 @@ class main_window:
             self.gui_root, width=self._column_width[2],
             text=self._tk_var_obj[1][2], font=font_collection['header1'], relief='ridge'
         )
-        self._tk_grid_obj[1][2].grid(row=1, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+        self._tk_grid_obj[1][2].grid(row=1, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
 
         # ============================================== ROW 2 ============================================= #
 
@@ -186,7 +191,7 @@ class main_window:
             self.gui_root, width=self._column_width[2],
             textvariable=self._tk_var_obj[2][2], font=font_collection['header1'], relief='ridge'
         )
-        self._tk_grid_obj[2][2].grid(row=2, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+        self._tk_grid_obj[2][2].grid(row=2, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
 
         # ============================================== ROW 3 ============================================= #
         self._tk_grid_obj[3][0] = tk.Message(
@@ -260,6 +265,20 @@ class main_window:
             textvariable=self._tk_var_obj[4][5], font=font_collection['body1'], justify='right'
         )
         self._tk_grid_obj[4][5].grid(row=4, column=5, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        # ============================================== ROW 5 ============================================= #
+        self._tk_grid_obj[5][0] = tk.Message(
+            self.gui_root, width=self._column_width[0],
+            text=self._tk_var_obj[5][0], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[5][0].grid(row=5, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        # ============================================== ROW 6 ============================================= #
+        self._tk_grid_obj[6][0] = tk.Message(
+            self.gui_root, width=self._column_width[0],
+            textvariable=self._tk_var_obj[6][0], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[6][0].grid(row=6, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
     # ========================================== Button Commands ========================================== #
     def __button_stop_main(self):

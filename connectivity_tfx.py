@@ -31,7 +31,7 @@ class tfx_webservice(Thread):
 
     def run(self):
 
-        print(self.__name + ' thread - Starting.')
+        print(self.__name + ' thread - Started.')
         self.parent.update_thread_status(self.__name, 'Online')
 
         # Main loop
