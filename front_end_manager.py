@@ -28,7 +28,7 @@ class gui_manager(Thread):
         self.status_grid = self.master_thread.status_grid
         self.selection_grid = self.master_thread.selection_grid
         self.data_grid = self.master_thread.data_grid
-        self.loop_timer = 0.05
+        self.loop_timer = 0.5
 
         # Class queues
         self.inbound_q  = inbound_queue
@@ -138,7 +138,7 @@ class main_window:
                 4: 'Target (CAD):', 5: tk.StringVar()},
             5: {0: 'Quadriga CAD Price', 1: 'Quadriga USD Price', 2: 'BitFinex CAD Price', 4: 'BitFinex USD Price'},
             6: {0: tk.DoubleVar(), 1: tk.DoubleVar(), 2: tk.DoubleVar(), 4: tk.DoubleVar()},
-            7: {0: ''}                                                          # Spacing
+            7: {0: 'Estimated Spread:'}
         }
 
         # Window width settings
@@ -279,6 +279,13 @@ class main_window:
             textvariable=self._tk_var_obj[6][0], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[6][0].grid(row=6, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        # ============================================== ROW 7 ============================================= #
+        self._tk_grid_obj[7][0] = tk.Message(
+            self.gui_root, width=self._column_width[0],
+            text=self._tk_var_obj[7][0], font=font_collection['header1']
+        )
+        self._tk_grid_obj[7][0].grid(row=7, column=0, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
     # ========================================== Button Commands ========================================== #
     def __button_stop_main(self):
