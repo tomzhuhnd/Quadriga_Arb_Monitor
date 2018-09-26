@@ -17,7 +17,7 @@ class qcx_webservice(Thread):
 
         # Class variables
         self.parent = parent
-        self.loop_timer = 2
+        self.loop_timer = 5           # There are around 15 requests before the requests get rejected
 
         # Class queues
         self.outbound_queue = outbound_queue
@@ -38,17 +38,21 @@ class qcx_webservice(Thread):
 
             # print(self.parent.selection_grid['target_coin'], self.parent.selection_grid['target_notional'])
 
-            self.request_orderbook('cad')
+            # Skip the quote because the necessary info has not been provided by the user
+            if self.parent.selection_grid['target_coin'] == '-' or self.parent.selection_grid['target_notional'] == 0.0:
+                continue
+
+            cad_price = self.request_orderbook('cad')
+            self.parent.data_grid['qcx_cad'] = cad_price
+
+            usd_price = self.request_orderbook('usd')
+            self.parent.data_grid['qcx_usd'] = usd_price
 
             time.sleep(self.loop_timer)
 
         return
 
     def request_orderbook(self, base_currency):
-
-        # Check to see if a target_coin and target_notional has been selected
-        if self.parent.selection_grid['target_coin'] == '-' or self.parent.selection_grid['target_notional'] == 0.0:
-            return
 
         target_coin = self.parent.selection_grid['target_coin'].lower()
         target_notional = self.parent.selection_grid['target_notional']
@@ -71,12 +75,20 @@ class qcx_webservice(Thread):
         else:
             raw_resp = json.loads(resp.content.decode('utf-8'))
 
-        if target_side == 'asks':
-            order_book = raw_resp['asks']
-        else:
-            order_book = raw_resp['bids']
+        try:
+            if target_side == 'asks':
+                order_book = raw_resp['asks']
+            else:
+                order_book = raw_resp['bids']
 
-        print('Average Cost of Coins: ' + str(self.average_cost_from_book(target_notional, order_book)))
+            # FX Adjustment on the target notional
+            if base_currency.lower() != 'cad':
+                target_notional = target_notional / self.parent.data_grid['fx_rate']
+
+            return self.average_cost_from_book(target_notional, order_book)
+        except:
+            print(raw_resp)
+            return 0.0
 
     def average_cost_from_book(self, target_notional, order_book):
 

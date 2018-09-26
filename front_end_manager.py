@@ -28,7 +28,7 @@ class gui_manager(Thread):
         self.status_grid = self.master_thread.status_grid
         self.selection_grid = self.master_thread.selection_grid
         self.data_grid = self.master_thread.data_grid
-        self.loop_timer = 0.5
+        self.loop_timer = 0.05
 
         # Class queues
         self.inbound_q  = inbound_queue
@@ -113,7 +113,11 @@ class main_window:
 
         # Data grid mappings to GUI dynamic variables
         self.data_map = {
-            'fx_pair': (3, 3), 'fx_rate': (3, 5)
+            'fx_pair': (3, 3), 'fx_rate': (3, 5), 'qcx_cad': (6, 0), 'qcx_usd': (6, 1)
+        }
+
+        self.data_format_map = {
+            'qcx_cad': '$ {0:.2f}', 'qcx_usd': '$ {0:.2f}'
         }
 
         # Window grid objects
@@ -125,7 +129,7 @@ class main_window:
             4: {0: None, 1: None, 2: None,          4: None, 5: None},
             5: {0: None, 1: None, 2: None,          4: None},
             6: {0: None, 1: None, 2: None,          4: None},
-            7: {0: None}                                                        # Spacing
+            7: {0: None, 1: None}                                                     # Spacing
         }
         # Window grid variables
         self._tk_var_obj = {
@@ -137,8 +141,8 @@ class main_window:
             4: {0: 'Notional Target (CAD):', 1: tk.DoubleVar(), 2: 'Set Notional Target',
                 4: 'Target (CAD):', 5: tk.StringVar()},
             5: {0: 'Quadriga CAD Price', 1: 'Quadriga USD Price', 2: 'BitFinex CAD Price', 4: 'BitFinex USD Price'},
-            6: {0: tk.DoubleVar(), 1: tk.DoubleVar(), 2: tk.DoubleVar(), 4: tk.DoubleVar()},
-            7: {0: 'Estimated Spread:'}
+            6: {0: tk.StringVar(), 1: tk.StringVar(), 2: tk.DoubleVar(), 4: tk.DoubleVar()},
+            7: {0: 'Implied FX Spread:', 1: tk.StringVar()}
         }
 
         # Window width settings
@@ -273,12 +277,25 @@ class main_window:
         )
         self._tk_grid_obj[5][0].grid(row=5, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_grid_obj[5][1] = tk.Message(
+            self.gui_root, width=self._column_width[1],
+            text=self._tk_var_obj[5][1], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[5][1].grid(row=5, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
         # ============================================== ROW 6 ============================================= #
         self._tk_grid_obj[6][0] = tk.Message(
             self.gui_root, width=self._column_width[0],
             textvariable=self._tk_var_obj[6][0], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[6][0].grid(row=6, column=0, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[6][1] = tk.Message(
+            self.gui_root, width=self._column_width[1],
+            textvariable=self._tk_var_obj[6][1], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[6][1].grid(row=6, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
 
         # ============================================== ROW 7 ============================================= #
         self._tk_grid_obj[7][0] = tk.Message(
@@ -330,7 +347,11 @@ class main_window:
         for item in self.parent.data_grid:
             if item in self.data_map:
                 position = self.data_map[item]
-                self._tk_var_obj[position[0]][position[1]].set(self.parent.data_grid[item])
+                if item in self.data_format_map:
+                    self._tk_var_obj[position[0]][position[1]].set(
+                        self.data_format_map[item].format(self.parent.data_grid[item]))
+                else:
+                    self._tk_var_obj[position[0]][position[1]].set(self.parent.data_grid[item])
             else:
                 print(self.__name + ' thread - Warning! No tkinter grid variable for data object: "' + str(item) + '".')
 

@@ -44,7 +44,7 @@ class program_master(Thread):
 
         self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Offline', 'qcx_ws': 'Offline'}
         self.selection_grid = {'target_coin': '-', 'target_notional': 0.0}
-        self.data_grid = {'fx_pair': '', 'fx_rate': 0.0}
+        self.data_grid = {'fx_pair': '', 'fx_rate': 0.0, 'qcx_cad': 0.0, 'qcx_usd': 0.0}
 
         # Class command handlers
         self.command_handlers = {
@@ -90,6 +90,8 @@ class program_master(Thread):
             if not self._inbound_gui_q.empty():
                 src_name, tgt_name, command, payload = self._inbound_gui_q.get()
                 self.run_cmd(src_name, tgt_name, command, payload)
+
+            
 
             time.sleep(self.__sleep_timer)
 
