@@ -42,20 +42,31 @@ class qcx_webservice(Thread):
             if self.parent.selection_grid['target_coin'] == '-' or self.parent.selection_grid['target_notional'] == 0.0:
                 continue
 
-            cad_price = self.request_orderbook('cad')
-            self.parent.data_grid['qcx_cad'] = cad_price
-
-            usd_price = self.request_orderbook('usd')
-            self.parent.data_grid['qcx_usd'] = usd_price
+            self.calculate_data_grids()
 
             time.sleep(self.loop_timer)
 
         return
 
+    def calculate_data_grids(self):
+
+        cad_order_book = self.request_orderbook('cad')
+        coin_quantity, cad_price = self.average_cost_from_book_notional(cad_order_book, 'cad',
+                                                                        self.parent.selection_grid['target_notional'])
+
+        self.parent.data_grid['qcx_cad'] = cad_price
+
+        if self.parent.selection_grid['target_coin_multi_fiat']:
+            usd_order_book = self.request_orderbook('usd')
+            coin_quantity, usd_price = self.average_cost_from_book_quantity(usd_order_book, coin_quantity)
+            self.parent.data_grid['qcx_usd'] = usd_price
+        else:
+            self.parent.data_grid['qcx_usd'] = 0.0
+
+
     def request_orderbook(self, base_currency):
 
         target_coin = self.parent.selection_grid['target_coin'].lower()
-        target_notional = self.parent.selection_grid['target_notional']
         target_side = self.parent.settings_grid['EXCHANGE_SIDE'][self.__name]
 
         if target_side == 'sell':
@@ -80,17 +91,17 @@ class qcx_webservice(Thread):
                 order_book = raw_resp['asks']
             else:
                 order_book = raw_resp['bids']
-
-            # FX Adjustment on the target notional
-            if base_currency.lower() != 'cad':
-                target_notional = target_notional / self.parent.data_grid['fx_rate']
-
-            return self.average_cost_from_book(target_notional, order_book)
+            return order_book
         except:
             print(raw_resp)
-            return 0.0
 
-    def average_cost_from_book(self, target_notional, order_book):
+    def average_cost_from_book_notional(self, order_book, base_currency, notional):
+
+        target_notional = notional
+
+        # FX Adjustment on the target notional
+        if base_currency.lower() != 'cad':
+            target_notional = target_notional / self.parent.data_grid['fx_rate']
 
         total_coin = 0.0
         total_notional = 0.0
@@ -107,49 +118,30 @@ class qcx_webservice(Thread):
                 total_notional += level_notional
                 total_coin += coins
 
-        return total_notional / total_coin
+        return total_coin, total_notional / total_coin
+
+    def average_cost_from_book_quantity(self, order_book, quantity):
+
+        target_quantity = quantity
+
+        total_coin = 0.0
+        total_notional = 0.0
+
+        for level in order_book:
+            price = float(level[0])
+            coins = float(level[1])
+            if coins + total_coin >= target_quantity:
+                total_notional += (target_quantity - total_coin) * price
+                total_coin = target_quantity
+                break
+            else:
+                total_notional += price * coins
+                total_coin += coins
+
+        return total_coin, total_notional / total_coin
 
     def stop(self):
 
         print(self.__name + ' thread - Shutting down.')
         self.parent.update_thread_status(self.__name, 'Offline')
         self._stopped.set()
-
-def request_orderbook():
-
-    request_url = config.qcx_url + 'order_book'
-
-    request_parameters = {'book': 'btc_cad'}
-    resp = requests.get(request_url, params=request_parameters)
-
-    side = 'bids'
-    notional = 50000
-
-    if resp.status_code != 200:
-        return False
-    else:
-        raw_resp = json.loads(resp.content.decode('utf-8'))
-
-    total_coin = 0
-    total_notional = 0
-
-    if side =='asks':
-        order_book = raw_resp['asks']
-    else:
-        order_book = raw_resp['bids']
-
-    for ask in order_book:
-        price = float(ask[0])
-        coins = float(ask[1])
-        level_notional = price * coins
-        if total_notional + level_notional >= notional:
-            total_notional += notional
-            total_coin += notional / price
-            break
-        else:
-            total_notional += level_notional
-            total_coin += coins
-            notional -= level_notional
-
-    for asks in raw_resp['bids']:
-        print(asks)

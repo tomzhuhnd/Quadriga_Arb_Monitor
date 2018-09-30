@@ -1,5 +1,6 @@
 # Import generic packages
 import time
+import configparser
 
 # Import multi-threading capacity
 from multiprocessing import Queue
@@ -41,6 +42,13 @@ class gui_manager(Thread):
         self.command_handlers = {
 
         }
+
+        # Load configuration from last open
+        user_config = configparser.ConfigParser()
+        user_config.read('user_settings.ini')
+        self.master_thread.update_thread_selection('target_coin', user_config['SELECTION']['target_coin'])
+        self.master_thread.update_thread_selection('target_notional',
+                                                   float(user_config['SELECTION']['target_notional']))
 
         print('Done.')
         super(gui_manager, self).__init__()
@@ -85,6 +93,12 @@ class gui_manager(Thread):
             self.gui_root.quit()
 
     def stop(self):
+        # Save last selection for next startup
+        config = configparser.ConfigParser()
+        config['SELECTION'] = self.selection_grid
+        with open('user_settings.ini', 'w') as configfile:
+            config.write(configfile)
+
         # Set Stop event
         print(self.__name + ' thread - Shutting down.')
         self._stopped.set()
@@ -113,11 +127,22 @@ class main_window:
 
         # Data grid mappings to GUI dynamic variables
         self.data_map = {
-            'fx_pair': (3, 3), 'fx_rate': (3, 5), 'qcx_cad': (6, 0), 'qcx_usd': (6, 1)
+            'fx_pair': (3, 3), 'fx_rate': (3, 5), 'qcx_cad': (6, 0), 'qcx_usd': (6, 1), 'qcx_usd_to_cad': (6, 2),
+            'qcx_implied_fx_rate': (6, 4), 'qcx_internal_fx_coin_spread': (7, 1), 'qcx_internal_fx_spread': (7, 4)
+        }
+
+        self.data_logic_map = {
+            'qcx_usd': self.__check_if_multi_fiat_active,
+            'qcx_usd_to_cad': self.__check_if_multi_fiat_active,
+            'qcx_implied_fx_rate': self.__check_if_multi_fiat_active,
+            'qcx_internal_fx_coin_spread': self.__check_if_multi_fiat_active,
+            'qcx_internal_fx_spread': self.__check_if_multi_fiat_active
         }
 
         self.data_format_map = {
-            'qcx_cad': '$ {0:.2f}', 'qcx_usd': '$ {0:.2f}'
+            'qcx_cad': '$ {0:.2f}', 'qcx_usd': '$ {0:.2f}', 'qcx_usd_to_cad': '$ {0:.2f}',
+            'qcx_implied_fx_rate': '{0:.6}', 'qcx_internal_fx_coin_spread': '$ {0:.2f}',
+            'qcx_internal_fx_spread': '{} BPS'
         }
 
         # Window grid objects
@@ -129,7 +154,7 @@ class main_window:
             4: {0: None, 1: None, 2: None,          4: None, 5: None},
             5: {0: None, 1: None, 2: None,          4: None},
             6: {0: None, 1: None, 2: None,          4: None},
-            7: {0: None, 1: None}                                                     # Spacing
+            7: {0: None, 1: None, 2: None,          4: None}
         }
         # Window grid variables
         self._tk_var_obj = {
@@ -140,13 +165,14 @@ class main_window:
                 4: 'FX Rate:', 5: tk.DoubleVar()},
             4: {0: 'Notional Target (CAD):', 1: tk.DoubleVar(), 2: 'Set Notional Target',
                 4: 'Target (CAD):', 5: tk.StringVar()},
-            5: {0: 'Quadriga CAD Price', 1: 'Quadriga USD Price', 2: 'BitFinex CAD Price', 4: 'BitFinex USD Price'},
-            6: {0: tk.StringVar(), 1: tk.StringVar(), 2: tk.DoubleVar(), 4: tk.DoubleVar()},
-            7: {0: 'Implied FX Spread:', 1: tk.StringVar()}
+            5: {0: 'Quadriga CAD Price', 1: 'Quadriga USD Price', 2: 'QCX Implied CAD Price',
+                4: 'QCX Implied FX Rate'},
+            6: {0: tk.StringVar(), 1: tk.StringVar(), 2: tk.StringVar(), 4: tk.StringVar()},
+            7: {0: 'QCX Internal FX Spread:', 1: tk.StringVar(), 2: 'QCX FX BPS Spread:', 4: tk.StringVar()}
         }
 
         # Window width settings
-        self._column_width = {0: 250, 1: 250, 2: 150, 3: 150, 4: 150, 5: 150}
+        self._column_width = {0: 250, 1: 250, 2: 250, 3: 250, 4: 250, 5: 150}
 
         # ========================================== GRID OBJECTS ========================================== #
         # ============================================== ROW 0 ============================================= #
@@ -264,6 +290,7 @@ class main_window:
         )
         self._tk_grid_obj[4][4].grid(row=4, column=4, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_var_obj[4][5].set('$ {0:.2f}'.format(self.parent.selection_grid['target_notional']))
         self._tk_grid_obj[4][5] = tk.Message(
             self.gui_root, width=self._column_width[5],
             textvariable=self._tk_var_obj[4][5], font=font_collection['body1'], justify='right'
@@ -283,6 +310,18 @@ class main_window:
         )
         self._tk_grid_obj[5][1].grid(row=5, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_grid_obj[5][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            text=self._tk_var_obj[5][2], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[5][2].grid(row=5, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
+
+        self._tk_grid_obj[5][4] = tk.Message(
+            self.gui_root, width=self._column_width[4],
+            text=self._tk_var_obj[5][4], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[5][4].grid(row=5, column=4, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
+
         # ============================================== ROW 6 ============================================= #
         self._tk_grid_obj[6][0] = tk.Message(
             self.gui_root, width=self._column_width[0],
@@ -296,6 +335,17 @@ class main_window:
         )
         self._tk_grid_obj[6][1].grid(row=6, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_grid_obj[6][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            textvariable=self._tk_var_obj[6][2], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[6][2].grid(row=6, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
+
+        self._tk_grid_obj[6][4] = tk.Message(
+            self.gui_root, width=self._column_width[4],
+            textvariable=self._tk_var_obj[6][4], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[6][4].grid(row=6, column=4, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
 
         # ============================================== ROW 7 ============================================= #
         self._tk_grid_obj[7][0] = tk.Message(
@@ -303,6 +353,24 @@ class main_window:
             text=self._tk_var_obj[7][0], font=font_collection['header1']
         )
         self._tk_grid_obj[7][0].grid(row=7, column=0, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[7][1] = tk.Message(
+            self.gui_root, width=self._column_width[1],
+            textvariable=self._tk_var_obj[7][1], font=font_collection['header1']
+        )
+        self._tk_grid_obj[7][1].grid(row=7, column=1, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[7][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            text=self._tk_var_obj[7][2], font=font_collection['header1']
+        )
+        self._tk_grid_obj[7][2].grid(row=7, column=2, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
+
+        self._tk_grid_obj[7][4] = tk.Message(
+            self.gui_root, width=self._column_width[4],
+            textvariable=self._tk_var_obj[7][4], font=font_collection['header1']
+        )
+        self._tk_grid_obj[7][4].grid(row=7, column=4, padx=5, pady=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
 
     # ========================================== Button Commands ========================================== #
     def __button_stop_main(self):
@@ -348,10 +416,22 @@ class main_window:
             if item in self.data_map:
                 position = self.data_map[item]
                 if item in self.data_format_map:
-                    self._tk_var_obj[position[0]][position[1]].set(
-                        self.data_format_map[item].format(self.parent.data_grid[item]))
+                    if item in self.data_logic_map:
+                        if self.data_logic_map[item](position[0], position[1]):
+                            self._tk_var_obj[position[0]][position[1]].set(
+                                self.data_format_map[item].format(self.parent.data_grid[item]))
+                    else:
+                        self._tk_var_obj[position[0]][position[1]].set(
+                            self.data_format_map[item].format(self.parent.data_grid[item]))
                 else:
                     self._tk_var_obj[position[0]][position[1]].set(self.parent.data_grid[item])
-            else:
-                print(self.__name + ' thread - Warning! No tkinter grid variable for data object: "' + str(item) + '".')
+            # else:
+            #     print(self.__name + ' thread - Warning! No tkinter grid variable for data object: "' + str(item) + '".')
 
+    # ========================================== Internal facing commands========================================== #
+
+    def __check_if_multi_fiat_active(self, x_pos, y_pos):
+        if self.parent.selection_grid['target_coin_multi_fiat'] == True:
+            return True
+        else:
+            self._tk_var_obj[x_pos][y_pos].set('Not Available')

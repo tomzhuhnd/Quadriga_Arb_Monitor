@@ -8,6 +8,7 @@ from threading          import Thread, Event
 # Program packages
 import front_end_manager
 import connectivity_tfx, connectivity_qcx
+import strategy_manager
 
 # Session settings
 
@@ -20,7 +21,8 @@ class program_master(Thread):
         print(self.__name + ' thread - Initializing ... ', end='')
 
         # Class internal variables
-        self.__sleep_timer = 0.01
+        # self.__sleep_timer = 0.01
+        self.__sleep_timer = 1
 
         # Class internal events
         self.stopped = Event()
@@ -28,6 +30,7 @@ class program_master(Thread):
         # Thread pointers
         self._gui_thread = None
         self._bfx_thread = None
+        self._qcx_thread = None
 
         # Incoming Queues
         self._inbound_gui_q = Queue()
@@ -40,11 +43,17 @@ class program_master(Thread):
         # Data grid variables
         self.settings_grid = {}
         self.settings_grid['TARGET_ARB_COINS'] = ['BTC', 'ETH', 'BCH', 'LTC', '-']
+        self.settings_grid['MULTI_FIAT'] = {
+            'qcx_ws': ['BTC']
+        }
         self.settings_grid['EXCHANGE_SIDE'] = {'qcx_ws': 'sell'}
 
         self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Offline', 'qcx_ws': 'Offline'}
-        self.selection_grid = {'target_coin': '-', 'target_notional': 0.0}
-        self.data_grid = {'fx_pair': '', 'fx_rate': 0.0, 'qcx_cad': 0.0, 'qcx_usd': 0.0}
+        self.selection_grid = {'target_coin': '-', 'target_notional': 0.0, 'target_coin_multi_fiat': None}
+        self.data_grid = {
+            'fx_pair': '', 'fx_rate': 0.0, 'qcx_cad': 0.0, 'qcx_usd': 0.0, 'qcx_usd_to_cad': 0.0,
+            'qcx_implied_fx_rate': 0.0, 'qcx_internal_fx_coin_spread': 0.0, 'qcx_internal_fx_spread': 0
+        }
 
         # Class command handlers
         self.command_handlers = {
@@ -83,6 +92,8 @@ class program_master(Thread):
         self._qcx_thread = connectivity_qcx.qcx_webservice(self, self._inbound_qcx_q)
         self._qcx_thread.start()
 
+        # Initialize strategy_class
+        self._strategy_core = strategy_manager.strategy_core(self)
 
         # Main Loop
         while not self.stopped.is_set():
@@ -91,7 +102,8 @@ class program_master(Thread):
                 src_name, tgt_name, command, payload = self._inbound_gui_q.get()
                 self.run_cmd(src_name, tgt_name, command, payload)
 
-            
+            # Compute all calculations
+            self._strategy_core.run_strategy()
 
             time.sleep(self.__sleep_timer)
 
@@ -115,6 +127,14 @@ class program_master(Thread):
             print('"' + selection + '" for "' + selection_name + '" has already been selected!')
         else:
             self.selection_grid[selection_name] = selection
+            if selection_name == 'target_coin':
+                if selection in self.settings_grid['MULTI_FIAT']['qcx_ws']:
+                    self.selection_grid['target_coin_multi_fiat'] = True
+                else:
+                    self.selection_grid['target_coin_multi_fiat'] = False
+                # Manually trigger data re-calc in qcx_ws
+                if self._qcx_thread is not None:
+                    self._qcx_thread.calculate_data_grids()
 
     def update_thread_data(self):
 
