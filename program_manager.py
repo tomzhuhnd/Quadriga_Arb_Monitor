@@ -7,7 +7,7 @@ from threading          import Thread, Event
 
 # Program packages
 import front_end_manager
-import connectivity_tfx, connectivity_qcx
+import connectivity_tfx, connectivity_qcx, connectivity_bfx
 import strategy_manager
 
 # Session settings
@@ -46,13 +46,24 @@ class program_master(Thread):
         self.settings_grid['MULTI_FIAT'] = {
             'qcx_ws': ['BTC']
         }
-        self.settings_grid['EXCHANGE_SIDE'] = {'qcx_ws': 'sell'}
+        self.settings_grid['EXCHANGE_SIDE'] = {'qcx_ws': 'sell', 'bfx_ws': 'buy'}
+        self.settings_grid['FEES'] = {
+            'qcx_ws': {
+                'coin_make': 0.005, 'coin_take': 0.005, 'coin_draw': 0, 'coin_fund': 0,
+                'fiat_make': 0.002, 'fiat_take': 0.002, 'fiat_draw': 0, 'fiat_fund': 0
+                },
+            'bfx_ws': {
+                'coin_make': 0.002, 'coin_take': 0.002, 'coin_draw': 0, 'coin_fund': 0,
+                'fiat_make': 0.002, 'fiat_take': 0.002, 'fiat_draw': 0, 'fiat_fund': 0
+            }
+        }
 
-        self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Offline', 'qcx_ws': 'Offline'}
+        self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Offline', 'qcx_ws': 'Offline', 'bfx_ws': 'Offline'}
         self.selection_grid = {'target_coin': '-', 'target_notional': 0.0, 'target_coin_multi_fiat': None}
         self.data_grid = {
             'fx_pair': '', 'fx_rate': 0.0, 'qcx_cad': 0.0, 'qcx_usd': 0.0, 'qcx_usd_to_cad': 0.0,
-            'qcx_implied_fx_rate': 0.0, 'qcx_internal_fx_coin_spread': 0.0, 'qcx_internal_fx_spread': 0
+            'qcx_implied_fx_rate': 0.0, 'qcx_internal_fx_coin_spread': 0.0, 'qcx_internal_fx_spread': 0,
+            'coin_quantity': 0.0, 'bfx_usd': 0.0, 'bfx_cad': 0.0
         }
 
         # Class command handlers
@@ -92,6 +103,10 @@ class program_master(Thread):
         self._qcx_thread = connectivity_qcx.qcx_webservice(self, self._inbound_qcx_q)
         self._qcx_thread.start()
 
+        # Start BitFinex Thread
+        self._bfx_thread = connectivity_bfx.bfx_webservice(self)
+        self._bfx_thread.start()
+
         # Initialize strategy_class
         self._strategy_core = strategy_manager.strategy_core(self)
 
@@ -112,6 +127,7 @@ class program_master(Thread):
             print(self.__name + ' thread - Main Program shutting down, killing child threads.')
             self._tfx_thread.stop()
             self._qcx_thread.stop()
+            self._bfx_thread.stop()
             self._gui_thread.stop()
             time.sleep(0.5)
             print(self.__name + ' thread - Exiting.')

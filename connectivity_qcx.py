@@ -55,6 +55,7 @@ class qcx_webservice(Thread):
                                                                         self.parent.selection_grid['target_notional'])
 
         self.parent.data_grid['qcx_cad'] = cad_price
+        self.parent.data_grid['coin_quantity'] = coin_quantity
 
         if self.parent.selection_grid['target_coin_multi_fiat']:
             usd_order_book = self.request_orderbook('usd')
