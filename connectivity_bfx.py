@@ -33,75 +33,46 @@ class bfx_webservice(Thread):
         # Main loop
         while not self._stopped.is_set():
 
-            self.calculate_data_grid()
+            if self.parent.selection_grid['target_coin'] == '-':
+                continue
+
+            # Grab coin/usd orderbook
+            orderbook, pair = self.request_orderbook(self.parent.selection_grid['target_coin'], 'usd')
+            self.parent.orderbook_grid[self.__name][pair] = self.standardize_orderbook(orderbook)
 
             time.sleep(self.loop_timer)
 
         return
 
-    def calculate_data_grid(self):
+    def request_orderbook(self, to_currency, from_currency):
 
-        if self.parent.data_grid['coin_quantity'] == 0.0 or self.parent.data_grid['fx_rate'] == 0.0:
-            self.loop_timer = 0.01
-            return
-        else:
-            self.loop_timer = 5
+        target_pair = to_currency.lower() + from_currency.lower()
 
-        order_book = self.request_orderbook()
-
-        coin_quantity, usd_price = self.average_cost_from_book_quantity(order_book,
-                                                                        self.parent.data_grid['coin_quantity'])
-
-        self.parent.data_grid['bfx_usd'] = usd_price
-        self.parent.data_grid['bfx_cad'] = usd_price * self.parent.data_grid['fx_rate']
-
-    def request_orderbook(self):
-
-        target_coin = self.parent.selection_grid['target_coin'].lower()
-        target_side = self.parent.settings_grid['EXCHANGE_SIDE'][self.__name]
-
-        if target_side == 'sell':
-            target_side = 'bids'
-        else:
-            target_side = 'asks'
-
-        request_url = config.bfx_url + 'book/' + target_coin + 'usd'
+        request_url = config.bfx_url + 'book/' + target_pair
         resp = requests.get(request_url)
 
         if resp.status_code != 200:
             print(resp.status_code)
             return
         else:
-            raw_resp = json.loads(resp.content.decode('utf-8'))
+            orderbook = json.loads(resp.content.decode('utf-8'))
 
-        try:
-            if target_side == 'asks':
-                order_book = raw_resp['asks']
-            else:
-                order_book = raw_resp['bids']
-            return order_book
-        except:
-            print(raw_resp)
+        return orderbook, target_pair
 
-    def average_cost_from_book_quantity(self, order_book, quantity):
+    def standardize_orderbook(self, orderbook):
 
-        target_quantity = quantity
+        bids_book = {}
+        asks_book = {}
 
-        total_coin = 0.0
-        total_notional = 0.0
+        for level in orderbook['bids']:
+            bids_book[float(level['price'])] = float(level['amount'])
+        for level in orderbook['asks']:
+            asks_book[float(level['price'])] = float(level['amount'])
 
-        for level in order_book:
-            price = float(level['price'])
-            coins = float(level['amount'])
-            if coins + total_coin >= target_quantity:
-                total_notional += (target_quantity - total_coin) * price
-                total_coin = target_quantity
-                break
-            else:
-                total_notional += price * coins
-                total_coin += coins
+        orderbook = {'asks': asks_book, 'bids': bids_book}
 
-        return total_coin, total_notional / total_coin
+        return orderbook
+
 
     def stop(self):
 

@@ -46,7 +46,6 @@ class program_master(Thread):
         self.settings_grid['MULTI_FIAT'] = {
             'qcx_ws': ['BTC']
         }
-        self.settings_grid['EXCHANGE_SIDE'] = {'qcx_ws': 'sell', 'bfx_ws': 'buy'}
         self.settings_grid['FEES'] = {
             'qcx_ws': {
                 'coin_make': 0.005, 'coin_take': 0.005, 'coin_draw': 0, 'coin_fund': 0,
@@ -60,10 +59,24 @@ class program_master(Thread):
 
         self.status_grid = {'master': 'Inactive', 'tfx_ws': 'Offline', 'qcx_ws': 'Offline', 'bfx_ws': 'Offline'}
         self.selection_grid = {'target_coin': '-', 'target_notional': 0.0, 'target_coin_multi_fiat': None}
+        self.orderbook_grid = {'bfx_ws': {}, 'qcx_ws': {}}
+        # Values that the strategy manager manipulates
+        self.balance_fiat_grid = {
+            'starting_cad': ('CAD', 0.0), 'starting_usd': ('USD', 0.0), 'ending_cad': ('CAD', 0.0),
+            'bfx_fiat_amount': ('USD', 0.0), 'qcx_fiat_amount': ('CAD', 0.0)
+        }
+        self.balance_coin_grid = {
+            'bfx_coin_amount': (None, 0.0),'qcx_coin_amount': (None, 0.0)
+        }
+        self.fees_grid = {
+            'bfx_ws': {'trading': 0.0, 'deposit': 0.0, 'withdraw': 0.0},
+            'qcx_ws': {'trading': 0.0, 'deposit': 0.0, 'withdraw': 0.0}
+        }
+        # Values that the GUI consumes
         self.data_grid = {
             'fx_pair': '', 'fx_rate': 0.0, 'qcx_cad': 0.0, 'qcx_usd': 0.0, 'qcx_usd_to_cad': 0.0,
             'qcx_implied_fx_rate': 0.0, 'qcx_internal_fx_coin_spread': 0.0, 'qcx_internal_fx_spread': 0,
-            'coin_quantity': 0.0, 'bfx_usd': 0.0, 'bfx_cad': 0.0
+            'coin_quantity': 0.0, 'bfx_usd': 0.0, 'bfx_cad': 0.0,
         }
 
         # Class command handlers
@@ -118,6 +131,7 @@ class program_master(Thread):
                 self.run_cmd(src_name, tgt_name, command, payload)
 
             # Compute all calculations
+            self.reset_strategy_grids()
             self._strategy_core.run_strategy()
 
             time.sleep(self.__sleep_timer)
@@ -142,20 +156,25 @@ class program_master(Thread):
         if self.selection_grid[selection_name] == selection:
             print('"' + selection + '" for "' + selection_name + '" has already been selected!')
         else:
+            # TODO: Reset all the data grids that are sensitive to selection criteria
+
             self.selection_grid[selection_name] = selection
             if selection_name == 'target_coin':
                 if selection in self.settings_grid['MULTI_FIAT']['qcx_ws']:
                     self.selection_grid['target_coin_multi_fiat'] = True
                 else:
                     self.selection_grid['target_coin_multi_fiat'] = False
-                # Manually trigger data re-calc in qcx_ws
-                if self._qcx_thread is not None:
-                    self._qcx_thread.calculate_data_grids()
 
-    def update_thread_data(self):
+    def reset_strategy_grids(self):
 
-        # Pushes entire data_grid to all threads that consume it
-        pass
+        for element in self.balance_fiat_grid:
+            self.balance_fiat_grid[element] = (self.balance_fiat_grid[element][0], 0.0)
+        for element in self.balance_fiat_grid:
+            self.balance_coin_grid[element] = (None, 0.0)
+        for element in self.fees_grid:
+            self.fees_grid[element] = {'trading': 0.0, 'deposit': 0.0, 'withdraw': 0.0}
+
+
 
     def run_cmd(self, src_name, tgt_name, cmd_name, payload):
         if not tgt_name in self.thread_command_handlers:

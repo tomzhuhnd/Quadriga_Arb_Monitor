@@ -36,48 +36,28 @@ class qcx_webservice(Thread):
         # Main loop
         while not self._stopped.is_set():
 
-            # print(self.parent.selection_grid['target_coin'], self.parent.selection_grid['target_notional'])
-
-            # Skip the quote because the necessary info has not been provided by the user
-            if self.parent.selection_grid['target_coin'] == '-' or self.parent.selection_grid['target_notional'] == 0.0:
+            if self.parent.selection_grid['target_coin'] == '-':
                 continue
 
-            self.calculate_data_grids()
+            to_coin = self.parent.selection_grid['target_coin']
+
+            # Grab CAD book
+            orderbook, pair = self.request_orderbook(to_coin, 'cad')
+            self.parent.orderbook_grid[self.__name][pair] = self.standardize_orderbook(orderbook)
+
+            # Grab USD book
+            orderbook, pair = self.request_orderbook(to_coin, 'usd')
+            self.parent.orderbook_grid[self.__name][pair] = self.standardize_orderbook(orderbook)
 
             time.sleep(self.loop_timer)
 
         return
 
-    def calculate_data_grids(self):
-
-        cad_order_book = self.request_orderbook('cad')
-        coin_quantity, cad_price = self.average_cost_from_book_notional(cad_order_book, 'cad',
-                                                                        self.parent.selection_grid['target_notional'])
-
-        self.parent.data_grid['qcx_cad'] = cad_price
-        self.parent.data_grid['coin_quantity'] = coin_quantity
-
-        if self.parent.selection_grid['target_coin_multi_fiat']:
-            usd_order_book = self.request_orderbook('usd')
-            coin_quantity, usd_price = self.average_cost_from_book_quantity(usd_order_book, coin_quantity)
-            self.parent.data_grid['qcx_usd'] = usd_price
-        else:
-            self.parent.data_grid['qcx_usd'] = 0.0
-
-
-    def request_orderbook(self, base_currency):
-
-        target_coin = self.parent.selection_grid['target_coin'].lower()
-        target_side = self.parent.settings_grid['EXCHANGE_SIDE'][self.__name]
-
-        if target_side == 'sell':
-            target_side = 'bids'
-        else:
-            target_side = 'asks'
+    def request_orderbook(self, to_currency, from_currency):
 
         request_url = config.qcx_url + 'order_book'
 
-        pair = target_coin + '_' + base_currency.lower()
+        pair = to_currency.lower() + '_' + from_currency.lower()
         request_parameters = {'book': pair}
         resp = requests.get(request_url, params=request_parameters)
 
@@ -85,61 +65,23 @@ class qcx_webservice(Thread):
             print(resp.status_code)
             return
         else:
-            raw_resp = json.loads(resp.content.decode('utf-8'))
+            order_book = json.loads(resp.content.decode('utf-8'))
 
-        try:
-            if target_side == 'asks':
-                order_book = raw_resp['asks']
-            else:
-                order_book = raw_resp['bids']
-            return order_book
-        except:
-            print(raw_resp)
+        return order_book, to_currency.lower() + from_currency.lower()
 
-    def average_cost_from_book_notional(self, order_book, base_currency, notional):
+    def standardize_orderbook(self, orderbook):
 
-        target_notional = notional
+        bids_book = {}
+        asks_book = {}
 
-        # FX Adjustment on the target notional
-        if base_currency.lower() != 'cad':
-            target_notional = target_notional / self.parent.data_grid['fx_rate']
+        for level in orderbook['bids']:
+            bids_book[float(level[0])] = float(level[1])
+        for level in orderbook['asks']:
+            asks_book[float(level[0])] = float(level[1])
 
-        total_coin = 0.0
-        total_notional = 0.0
+        orderbook = {'asks': asks_book, 'bids': bids_book}
 
-        for level in order_book:
-            price = float(level[0])
-            coins = float(level[1])
-            level_notional = price * coins
-            if total_notional + level_notional >= target_notional:
-                total_coin += (target_notional - total_notional) / price
-                total_notional += target_notional - total_notional
-                break
-            else:
-                total_notional += level_notional
-                total_coin += coins
-
-        return total_coin, total_notional / total_coin
-
-    def average_cost_from_book_quantity(self, order_book, quantity):
-
-        target_quantity = quantity
-
-        total_coin = 0.0
-        total_notional = 0.0
-
-        for level in order_book:
-            price = float(level[0])
-            coins = float(level[1])
-            if coins + total_coin >= target_quantity:
-                total_notional += (target_quantity - total_coin) * price
-                total_coin = target_quantity
-                break
-            else:
-                total_notional += price * coins
-                total_coin += coins
-
-        return total_coin, total_notional / total_coin
+        return orderbook
 
     def stop(self):
 
