@@ -33,31 +33,67 @@ class strategy_core():
         self.parent.balance_fiat_grid['starting_usd'] = ('USD', starting_notional_usd)
 
         # Calculate Deposit to BFX Fee
-        deposit_fee_usd = starting_notional_usd * self.parent.settings_grid['FEES']['bfx_ws']['fiat_fund']      # In USD
-        deposit_fee_cad = deposit_fee_usd * self.parent.data_grid['fx_rate']
-        deposit_amount  = starting_notional_usd - deposit_fee_usd
-        self.parent.fees_grid['bfx_ws']['deposit'] = deposit_fee_cad
-        self.parent.balance_fiat_grid['bfx_fiat_amount'] = ('USD', deposit_amount)
+        bfx_deposit_fee_usd = starting_notional_usd * self.parent.settings_grid['FEES']['bfx_ws']['fiat_fund']
+        bfx_deposit_fee_cad = bfx_deposit_fee_usd * self.parent.data_grid['fx_rate']
+        bfx_deposit_amount  = starting_notional_usd - bfx_deposit_fee_usd
+        self.parent.fees_grid['bfx_ws']['deposit'] = bfx_deposit_fee_cad
+        self.parent.balance_fiat_grid['bfx_fiat_amount'] = ('USD', bfx_deposit_amount)
 
         # Calculate BFX USD to Coin Trade           | BUYING COIN -> Use Asks side of the book
         orderbook = self.parent.orderbook_grid['bfx_ws'][target_coin + 'usd']
-        trade_amt, trade_cost = self.average_cost_from_book_notional(orderbook['asks'], deposit_amount)
+        bfx_trade_amt, bfx_trade_cost = self.average_cost_from_book_notional(orderbook['asks'], bfx_deposit_amount)
         # Calculate the trading fee
-        trade_fee = trade_amt * self.parent.settings_grid['FEES']['bfx_ws']['fiat_take']
-        trade_fee_cad = trade_fee * trade_cost * self.parent.data_grid['fx_rate']
-        bfx_coin_amt = trade_amt - trade_fee
-        self.parent.fees_grid['bfx_ws']['trading'] = trade_fee_cad
-        self.parent.balance_fiat_grid['bfx_coin_amount'] = (target_coin, bfx_coin_amt)
+        bfx_trade_fee = bfx_trade_amt * self.parent.settings_grid['FEES']['bfx_ws']['fiat_take']
+        bfx_trade_fee_cad = bfx_trade_fee * bfx_trade_cost * self.parent.data_grid['fx_rate']       # Convert into CAD
+        bfx_coin_amt = bfx_trade_amt - bfx_trade_fee
+        self.parent.fees_grid['bfx_ws']['trading'] = bfx_trade_fee_cad
+        self.parent.balance_coin_grid['bfx_coin_amount'] = (target_coin, bfx_coin_amt)
 
+        # BFX coin balance transfered to QCX
+        bfx_transfer_fee = bfx_coin_amt * self.parent.settings_grid['FEES']['bfx_ws']['coin_draw']      # In coin amount
+        bfx_transfer_fee_cad = bfx_transfer_fee * bfx_trade_cost * self.parent.data_grid['fx_rate']             # In CAD
+        self.parent.fees_grid['bfx_ws']['withdraw'] = bfx_transfer_fee_cad
+        qcx_coin_amt = bfx_coin_amt - bfx_transfer_fee
+        self.parent.balance_coin_grid['qcx_coin_amount'] = (target_coin, qcx_coin_amt)
 
-        print(trade_amt, trade_cost, trade_fee)
+        # Calculate QCX BTC to CAD Trade             | SELLING COIN -> Use Bids side of the book
+        # Calulate the equivalent cost in USD for comparison purposes
+        if target_coin + 'usd' in self.parent.orderbook_grid['qcx_ws']:
+            orderbook_usd = self.parent.orderbook_grid['qcx_ws'][target_coin + 'usd']
+            qcx_trade_amt_usd, qcx_trade_cost_usd = self.average_cost_from_book_quantity(orderbook_usd['bids'],
+                                                                                     qcx_coin_amt)
+        else:
+            qcx_trade_cost_usd = None
 
+        # Calculate cost in CAD
+        orderbook = self.parent.orderbook_grid['qcx_ws'][target_coin + 'cad']
+        qcx_trade_amt, qcx_trade_cost = self.average_cost_from_book_quantity(orderbook['bids'], qcx_coin_amt)
+        qcx_trade_amt = qcx_trade_amt * qcx_trade_cost
+        # Calculate the trading fee
+        qcx_trade_fee = qcx_trade_amt * self.parent.settings_grid['FEES']['qcx_ws']['fiat_take']
+        self.parent.fees_grid['qcx_ws']['trading'] = qcx_trade_fee
+        qcx_fiat_amt = qcx_trade_amt - qcx_trade_fee
+        self.parent.balance_fiat_grid['qcx_fiat_amount'] = ('CAD', qcx_fiat_amt)
 
-        # Update gui
-        self.parent.data_grid['bfx_usd'] = trade_cost
-        self.parent.data_grid['bfx_cad'] = trade_cost * self.parent.data_grid['fx_rate']
+        # Calculate the cost to take out the fiat
+        qcx_withdraw_fee = qcx_fiat_amt * self.parent.settings_grid['FEES']['qcx_ws']['fiat_draw']
+        self.parent.fees_grid['qcx_ws']['withdraw'] = qcx_withdraw_fee
+        ending_notional_cad = qcx_fiat_amt - qcx_withdraw_fee
+        self.parent.balance_fiat_grid['ending_cad'] = ('CAD', ending_notional_cad)
 
-
+        # GUI Display
+        self.parent.data_grid['qcx_cad'] = qcx_trade_cost
+        if qcx_trade_cost_usd is not None:
+            self.parent.data_grid['qcx_usd'] = qcx_trade_cost_usd
+        self.parent.data_grid['qcx_usd_to_cad'] = qcx_trade_cost_usd * self.parent.data_grid['fx_rate']
+        self.parent.data_grid['qcx_implied_fx_rate'] = qcx_trade_cost / qcx_trade_cost_usd
+        self.parent.data_grid['qcx_internal_fx_coin_spread'] = qcx_trade_cost - self.parent.data_grid['qcx_usd_to_cad']
+        qcx_internal_fx_spread = (self.parent.data_grid['qcx_implied_fx_rate'] - self.parent.data_grid['fx_rate'])
+        self.parent.data_grid['qcx_internal_fx_spread'] = round(qcx_internal_fx_spread * 10000, 2)
+        self.parent.data_grid['bfx_usd'] = bfx_trade_cost
+        self.parent.data_grid['bfx_cad'] = bfx_trade_cost * self.parent.data_grid['fx_rate']
+        self.parent.data_grid['arb_spread'] = ending_notional_cad - starting_notional_cad
+        self.parent.data_grid['arb_return'] = round((ending_notional_cad / starting_notional_cad) - 1, 6) * 100
 
     def average_cost_from_book_quantity(self, order_book, quantity):
 

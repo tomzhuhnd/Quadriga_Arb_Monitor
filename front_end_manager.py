@@ -129,7 +129,7 @@ class main_window:
         self.data_map = {
             'fx_pair': (3, 3), 'fx_rate': (3, 5), 'qcx_cad': (6, 0), 'qcx_usd': (6, 1), 'qcx_usd_to_cad': (6, 2),
             'qcx_implied_fx_rate': (6, 4), 'qcx_internal_fx_coin_spread': (7, 1), 'qcx_internal_fx_spread': (7, 4),
-            'bfx_cad': (9, 0), 'bfx_usd': (9, 1)
+            'bfx_cad': (9, 0), 'bfx_usd': (9, 1), 'arb_spread': (9, 2), 'arb_return': (9, 4)
         }
 
         self.data_logic_map = {
@@ -144,7 +144,8 @@ class main_window:
             'qcx_cad': '$ {0:.2f}', 'qcx_usd': '$ {0:.2f}', 'qcx_usd_to_cad': '$ {0:.2f}',
             'qcx_implied_fx_rate': '{0:.6}', 'qcx_internal_fx_coin_spread': '$ {0:.2f}',
             'qcx_internal_fx_spread': '{} BPS',
-            'bfx_cad': '$ {0:.2f}', 'bfx_usd': '$ {0:.2f}'
+            'bfx_cad': '$ {0:.2f}', 'bfx_usd': '$ {0:.2f}',
+            'arb_spread': '$ {0:.2f}', 'arb_return': '{0:.2f} %'
         }
 
         # Window grid objects
@@ -174,7 +175,7 @@ class main_window:
                  4: 'QCX Implied FX Rate'},
             6:  {0: tk.StringVar(), 1: tk.StringVar(), 2: tk.StringVar(), 4: tk.StringVar()},
             7:  {0: 'QCX Internal FX Spread:', 1: tk.StringVar(), 2: 'QCX FX BPS Spread:', 4: tk.StringVar()},
-            8:  {0: 'BFX CAD Price', 1: 'BFX USD Price', 2: 'Cross (CAD) Spread', 4: 'Cross Spread %'},
+            8:  {0: 'BFX CAD Price', 1: 'BFX USD Price', 2: 'Arbitrage P&L (CAD)', 4: 'Arbitrage % Return'},
             9:  {0: tk.StringVar(), 1: tk.StringVar(), 2: tk.StringVar(), 4: tk.StringVar()},
             10: {0: ''}
         }
@@ -405,6 +406,18 @@ class main_window:
         )
         self._tk_grid_obj[8][1].grid(row=8, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
 
+        self._tk_grid_obj[8][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            text=self._tk_var_obj[8][2], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[8][2].grid(row=8, column=2, padx=5, sticky=('N','W','E', 'S'), columnspan=2)
+
+        self._tk_grid_obj[8][4] = tk.Message(
+            self.gui_root, width=self._column_width[4],
+            text=self._tk_var_obj[8][4], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[8][4].grid(row=8, column=4, padx=5, sticky=('N','W','E','S'), columnspan=4)
+
         # ============================================== ROW 9 ============================================= #
         self._tk_grid_obj[9][0] = tk.Message(
             self.gui_root, width=self._column_width[0],
@@ -417,6 +430,18 @@ class main_window:
             textvariable=self._tk_var_obj[9][1], font=font_collection['header1'], relief='ridge'
         )
         self._tk_grid_obj[9][1].grid(row=9, column=1, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=1)
+
+        self._tk_grid_obj[9][2] = tk.Message(
+            self.gui_root, width=self._column_width[2],
+            textvariable=self._tk_var_obj[9][2], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[9][2].grid(row=9, column=2, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
+
+        self._tk_grid_obj[9][4] = tk.Message(
+            self.gui_root, width=self._column_width[4],
+            textvariable=self._tk_var_obj[9][4], font=font_collection['header1'], relief='ridge'
+        )
+        self._tk_grid_obj[9][4].grid(row=9, column=4, padx=5, sticky=('N', 'W', 'E', 'S'), columnspan=2)
 
     # ========================================== Button Commands ========================================== #
     def __button_stop_main(self):

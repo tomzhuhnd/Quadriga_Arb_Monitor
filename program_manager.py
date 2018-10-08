@@ -48,8 +48,8 @@ class program_master(Thread):
         }
         self.settings_grid['FEES'] = {
             'qcx_ws': {
-                'coin_make': 0.005, 'coin_take': 0.005, 'coin_draw': 0, 'coin_fund': 0,
-                'fiat_make': 0.002, 'fiat_take': 0.002, 'fiat_draw': 0, 'fiat_fund': 0
+                'coin_make': 0.002, 'coin_take': 0.002, 'coin_draw': 0, 'coin_fund': 0,
+                'fiat_make': 0.005, 'fiat_take': 0.005, 'fiat_draw': 0, 'fiat_fund': 0
                 },
             'bfx_ws': {
                 'coin_make': 0.002, 'coin_take': 0.002, 'coin_draw': 0, 'coin_fund': 0,
@@ -76,7 +76,7 @@ class program_master(Thread):
         self.data_grid = {
             'fx_pair': '', 'fx_rate': 0.0, 'qcx_cad': 0.0, 'qcx_usd': 0.0, 'qcx_usd_to_cad': 0.0,
             'qcx_implied_fx_rate': 0.0, 'qcx_internal_fx_coin_spread': 0.0, 'qcx_internal_fx_spread': 0,
-            'coin_quantity': 0.0, 'bfx_usd': 0.0, 'bfx_cad': 0.0,
+            'coin_quantity': 0.0, 'bfx_usd': 0.0, 'bfx_cad': 0.0, 'arb_spread': 0.0, 'arb_return': 0.0
         }
 
         # Class command handlers
