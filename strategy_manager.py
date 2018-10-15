@@ -17,13 +17,14 @@ class strategy_core():
 
     def run_bfx_to_usd_cad_arb(self):
 
+        target_coin = self.parent.selection_grid['target_coin'].lower()
+
         if (
                 self.parent.data_grid['fx_rate'] == 0 or self.parent.selection_grid['target_coin'] == '-' or
-                self.parent.selection_grid['target_notional'] == 0.0 or not self.parent.orderbook_grid['bfx_ws']
+                self.parent.selection_grid['target_notional'] == 0.0 or not self.parent.orderbook_grid['bfx_ws'] or
+                not(target_coin + 'cad' in self.parent.orderbook_grid['qcx_ws'])
         ):
             return
-
-        target_coin = self.parent.selection_grid['target_coin'].lower()
 
         starting_notional_cad = self.parent.selection_grid['target_notional']
         self.parent.balance_fiat_grid['starting_cad'] = ('CAD', starting_notional_cad)
