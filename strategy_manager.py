@@ -1,28 +1,44 @@
+import time
+import datetime
+import sql_manager
+
+
+
 class strategy_core():
 
     def __init__(self, parent):
 
         self.parent = parent
+        self.current_timestamp = None
+        self.store_data = True
+        self.__id_map_exchange = {'bfx': 1, 'qcx': 2}
+        self.__id_map_currency = {'CAD': 1, 'USD': 2, 'BTC': 100, 'ETH': 101}
 
     def run_strategy(self):
 
         self.run_bfx_to_usd_cad_arb()
 
+        if self.store_data:
+            if self.current_timestamp is None:
+                self.current_timestamp = int(time.time())
+            else:
+                current_time = int(time.time())
+                minutes = divmod(current_time - self.current_timestamp, 60)
+                if minutes[1] == 30:
+                    self.current_timestamp = current_time
+                else:
+                    return
 
-        # if self.parent.selection_grid['target_coin_multi_fiat']:
-        #     self.calculate_qcx_implied_usdcad()
-        #     self.calculate_qcx_usd_price_in_cad()
-        #     self.calculate_qcx_fx_spread()
-        #     self.calculate_qcx_vs_bfx_arb()
+            self.store_bfx_to_usd_cad_arb_data(self.current_timestamp)
 
     def run_bfx_to_usd_cad_arb(self):
 
         target_coin = self.parent.selection_grid['target_coin'].lower()
 
-        if (
-                self.parent.data_grid['fx_rate'] == 0 or self.parent.selection_grid['target_coin'] == '-' or
-                self.parent.selection_grid['target_notional'] == 0.0 or not self.parent.orderbook_grid['bfx_ws'] or
-                not(target_coin + 'cad' in self.parent.orderbook_grid['qcx_ws'])
+        if (self.parent.data_grid['fx_rate'] == 0 or self.parent.data_grid['fx_rate'] is None or
+            self.parent.selection_grid['target_coin'] == '-' or
+            self.parent.selection_grid['target_notional'] == 0.0 or not self.parent.orderbook_grid['bfx_ws'] or
+            not(target_coin + 'cad' in self.parent.orderbook_grid['qcx_ws'])
         ):
             return
 
@@ -95,6 +111,60 @@ class strategy_core():
         self.parent.data_grid['bfx_cad'] = bfx_trade_cost * self.parent.data_grid['fx_rate']
         self.parent.data_grid['arb_spread'] = ending_notional_cad - starting_notional_cad
         self.parent.data_grid['arb_return'] = round((ending_notional_cad / starting_notional_cad) - 1, 6) * 100
+
+    def store_bfx_to_usd_cad_arb_data(self, timestamp):
+
+        data = []
+
+        time_stamp = datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        bfx_usd = self.return_bid_ask_from_book(self.parent.orderbook_grid['bfx_ws']['btcusd'])
+        bfx_cad = self.return_bid_ask_from_book(self.parent.orderbook_grid['bfx_ws']['btcusd'],
+                                                self.parent.data_grid['fx_rate'])
+        qcx_usd = self.return_bid_ask_from_book(self.parent.orderbook_grid['qcx_ws']['btcusd'])
+        qcx_cad = self.return_bid_ask_from_book(self.parent.orderbook_grid['qcx_ws']['btccad'])
+
+
+        # Spots
+        data.append(self.generate_row_market_prices(time_stamp, 'bfx', 'BTC', 'USD', bfx_usd['bid'], False, False, 'bid'))
+        data.append(self.generate_row_market_prices(time_stamp, 'bfx', 'BTC', 'USD', bfx_usd['ask'], False, False, 'ask'))
+        data.append(self.generate_row_market_prices(time_stamp, 'bfx', 'BTC', 'CAD', bfx_cad['bid'], False, True, 'bid'))
+        data.append(self.generate_row_market_prices(time_stamp, 'bfx', 'BTC', 'CAD', bfx_cad['ask'], False, True, 'ask'))
+        data.append(self.generate_row_market_prices(time_stamp, 'qcx', 'BTC', 'USD', qcx_usd['bid'], False, False, 'bid'))
+        data.append(self.generate_row_market_prices(time_stamp, 'qcx', 'BTC', 'USD', qcx_usd['ask'], False, False, 'ask'))
+        data.append(self.generate_row_market_prices(time_stamp, 'qcx', 'BTC', 'CAD', qcx_cad['bid'], False, False, 'bid'))
+        data.append(self.generate_row_market_prices(time_stamp, 'qcx', 'BTC', 'CAD', qcx_cad['ask'], False, False, 'ask'))
+
+        sql_manager.upload_exchange_market_prices(data)
+
+    # Internal data functions
+    def generate_row_market_prices(self, timestamp, exch, base_ccy, quote_ccy, spot, calc, comp, price_type, notional=None):
+
+        data_list = []
+        data_list.append(timestamp)                                     # timestamp
+        data_list.append(self.__id_map_exchange[exch])                  # exchange_id
+        data_list.append(self.__id_map_currency[base_ccy])              # base_currency_id
+        data_list.append(self.__id_map_currency[quote_ccy])             # quote_currency_id
+        data_list.append(spot)
+        data_list.append(calc)
+        data_list.append(comp)
+        data_list.append(price_type)
+        if notional is None:
+            data_list.append("NULL")
+        else:
+            data_list.append(notional)
+
+        return data_list
+
+    # Internal Calcuation functions
+
+    def return_bid_ask_from_book(self, book, multiplier=None):
+
+        if multiplier is not None:
+            return {'ask': round(next(iter(book['asks'])) * multiplier, 8),
+                    'bid': round(next(iter(book['bids'])) * multiplier, 8)}
+        else:
+            return {'ask': round(next(iter(book['asks'])), 8),
+                    'bid': round(next(iter(book['bids'])), 8)}
 
     def average_cost_from_book_quantity(self, order_book, quantity):
 

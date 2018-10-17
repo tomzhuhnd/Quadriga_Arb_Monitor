@@ -21,8 +21,7 @@ class program_master(Thread):
         print(self.__name + ' thread - Initializing ... ', end='')
 
         # Class internal variables
-        # self.__sleep_timer = 0.01
-        self.__sleep_timer = 1
+        self.__sleep_timer = 0.5
 
         # Class internal events
         self.stopped = Event()
@@ -122,6 +121,9 @@ class program_master(Thread):
 
         # Initialize strategy_class
         self._strategy_core = strategy_manager.strategy_core(self)
+
+        # Wait for all the threads to properly load with data
+        time.sleep(2)
 
         # Main Loop
         while not self.stopped.is_set():
