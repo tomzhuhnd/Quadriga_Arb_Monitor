@@ -136,6 +136,17 @@ class strategy_core():
 
         sql_manager.upload_exchange_market_prices(data)
 
+        # Spread capture for QCX Arb
+        data = []
+
+        data += [time_stamp, 1, 2, 'buy', 'sell', 100, 1, 100, 1]
+        data += [self.parent.data_grid['bfx_cad'], self.parent.data_grid['qcx_cad']]
+        data += [self.parent.selection_grid['target_notional']]
+        data += [round(self.parent.data_grid['arb_spread'], 8)]
+
+        sql_manager.upload_arbitrage_statistics([data])
+
+
     # Internal data functions
     def generate_row_market_prices(self, timestamp, exch, base_ccy, quote_ccy, spot, calc, comp, price_type, notional=None):
 
